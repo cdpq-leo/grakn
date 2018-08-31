@@ -3,7 +3,7 @@
     <nav role="navigation" class="navbar-fixed z-depth-1">
         <div class="nav-wrapper">
             <div class="list-logo">
-              <img @click="toggleSideBar" src="/img/logo-text.png" class="logo-img"></img>
+              <img @click="toggleSideBar" src="img/logo-text.png" class="logo-img"></img>
             </div>
             <div class="dynamic-center">
                 <keep-alive>

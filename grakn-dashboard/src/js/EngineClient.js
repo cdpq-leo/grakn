@@ -42,8 +42,13 @@ export default {
   request(requestData: RequestData): Promise<string> {
     return new Promise((resolve, reject) => {
       try {
+        // Prepend path name to request's url.
+        var pathname = window.location.pathname;
+        if (pathname.charAt(pathname.Length - 1) === '/')
+          pathname = pathname.slice(0, -1);
+
         const req = new XMLHttpRequest();
-        req.open(requestData.requestType || 'GET', requestData.url);
+        req.open(requestData.requestType || 'GET', pathname + requestData.url);
         this.setHeaders(req, requestData);
 
         req.onload = function setOnLoad() {
