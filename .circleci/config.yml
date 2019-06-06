@@ -1,341 +1,588 @@
-version: 2
-references:
-    prepare_apt_repositories: &prepare_apt_repositories
-      run:
-        name: Prepare apt repositories
-        command: |
-          curl -sS https://dl.yarnpkg.com/debian/pubkey.gpg | sudo apt-key add -
-          echo "deb https://dl.yarnpkg.com/debian/ stable main" | sudo tee /etc/apt/sources.list.d/yarn.list
-          sudo apt-get install apt-transport-https
-          sudo apt-get update
+#
+# GRAKN.AI - THE KNOWLEDGE GRAPH
+# Copyright (C) 2018 Grakn Labs Ltd
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
+#
 
-    install_yarn_and_maven: &install_yarn_and_maven
-      run: sudo apt-get -y install yarn maven
+version: 2.1
+commands:
+  install-bazel-linux-rbe:
+    steps:
+      - run: curl -OL https://raw.githubusercontent.com/graknlabs/build-tools/master/ci/install-bazel-linux.sh
+      - run: bash ./install-bazel-linux.sh && rm ./install-bazel-linux.sh
+      - run: curl -OL https://raw.githubusercontent.com/graknlabs/build-tools/master/ci/install-bazel-rbe.sh
+      - run: bash ./install-bazel-rbe.sh && rm ./install-bazel-rbe.sh
 
-    install_node: &install_node
-      run:
-        name: Install nvm and node
-        command: |
-          curl -o- https://raw.githubusercontent.com/creationix/nvm/v0.33.5/install.sh | bash
-          export NVM_DIR="/opt/circleci/.nvm"
-          [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
-          nvm install v10.5.0
-          nvm alias default v10.5.0
-          echo 'export NVM_DIR="/opt/circleci/.nvm"' >> $BASH_ENV
-          echo "[ -s \"$NVM_DIR/nvm.sh\" ] && . \"$NVM_DIR/nvm.sh\"" >> $BASH_ENV
+  install-bazel-mac:
+    steps:
+      - run: curl -OL https://raw.githubusercontent.com/graknlabs/build-tools/master/ci/install-bazel-mac.sh
+      - run: bash ./install-bazel-mac.sh && rm ./install-bazel-mac.sh
 
-    attach_grakn_workspace: &attach_grakn_workspace
-      attach_workspace:
-        at: ~/grakn
+  install-rpm:
+    steps:
+      - run: sudo apt update && sudo apt install rpm -y
 
-    restore_m2_cache: &restore_m2_cache
-      restore_cache:
-        name: Restore maven m2 cache
-        key: grakn-cache-m2-version-8
-
-    save_m2_cache: &save_m2_cache
-      save_cache:
-        name: Save maven m2 cache
-        paths:
-          - ~/.m2
-        key: grakn-cache-m2-version-8
-
-    list_unit_tests: &list_unit_tests
-      run:
-        name: List Of Unit Tests To Be Ran On This Machine
-        command: cat parallelise-unit-tests.txt
-
-    list_it_tests: &list_it_tests
-      run:
-        name: List Of IT Tests To Be Ran On This Machine
-        command: cat parallelise-it-tests.txt
-
-    start_grakn_server: &start_grakn_server
-      run: nohup grakn-dist/target/grakn-core-test/grakn server start
-
-    save_test_results: &save_test_results
-      run:
-        name: Save test results
-        command: |
-          mkdir -p ~/grakn-surefire-reports/
-          find . -type f -regex ".*/target/surefire-reports/.*xml" -exec cp {} ~/grakn-surefire-reports/ \;
-        when: always
-
-    run_unit_it_tests: &run_unit_it_tests
-      run: mvn verify -Dsurefire.includesFile=`echo ~/grakn/parallelise-unit-tests.txt` -Dfailsafe.includesFile=`echo ~/grakn/parallelise-it-tests.txt` -P janus -U -Djetty.log.level=WARNING -Djetty.log.appender=STDOUT -DMaven.test.failure.ignore=true -Dsurefire.rerunFailingTestsCount=1
+  run-bazel-rbe:
+    parameters:
+      command:
+        type: string
+    steps:
+      - run: bazel run @graknlabs_build_tools//ci:run-bazel-rbe -- << parameters.command >>
 
 jobs:
   build:
     machine: true
     working_directory: ~/grakn
     steps:
+      - install-bazel-linux-rbe
+      - install-rpm
       - checkout
-      - *prepare_apt_repositories
-      - *install_yarn_and_maven
-      - *install_node
-      - *restore_m2_cache
-      - run: mvn versions:set -DnewVersion=test -DgenerateBackupPoms=false # sets version to be `test` so that we can refer to zip using always grakn-core-test
-      - run: mvn --batch-mode install -T 2.5C -DskipTests=true
-      - run: tar -xf grakn-dist/target/grakn-core-test.tar.gz -C grakn-dist/target/
-      - *save_m2_cache
-      - persist_to_workspace: #share Grakn with other jobs by putting it in the workspace
+      - run: bazel run @graknlabs_build_tools//checkstyle:test-coverage
+      - run-bazel-rbe:
+          command: bazel build //...
+
+  test-common:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //common/... --test_output=errors
+
+  test-console:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - install-rpm
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //console/... --test_output=errors
+
+  test-server:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - install-rpm
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //server/... --test_output=errors
+
+  test-integration:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //test-integration/server/... --test_output=errors
+      - run-bazel-rbe:
+          command: bazel test //test-integration/graql/executor/... --test_output=errors
+      - run-bazel-rbe:
+          command: bazel test //test-integration/graql/query/... --test_output=errors
+
+  test-integration-reasoner:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //test-integration/graql/reasoner/... --test_output=errors
+
+  test-integration-analytics:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //test-integration/graql/analytics/... --test_output=errors
+
+  test-end-to-end:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel test //test-end-to-end:test-end-to-end --test_output=streamed --spawn_strategy=standalone
+
+  test-assembly-mac-zip:
+    macos:
+      xcode: "9.0"
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-mac
+      - checkout
+      - run-bazel-rbe:
+          command: bazel build //:assemble-mac-zip
+      - run: unzip bazel-genfiles/grakn-core-all-mac.zip -d bazel-genfiles/
+      - run: nohup bazel-genfiles/grakn-core-all-mac/grakn server start
+      - run: bazel test //test/common:grakn-application-test --test_output=streamed --spawn_strategy=standalone --cache_test_results=no
+      - run: bazel-genfiles/grakn-core-all-mac/grakn server stop
+
+  test-assembly-windows-zip:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - checkout
+      - run:
+          command: test/assembly/windows/windows-zip.py
+          no_output_timeout: 20m
+
+  test-assembly-linux-targz:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel build //:assemble-linux-targz
+      - run: tar -xf bazel-genfiles/grakn-core-all-linux.tar.gz -C bazel-genfiles
+      - run: nohup bazel-genfiles/grakn-core-all-linux/grakn server start
+      - run: bazel test //test/common:grakn-application-test --test_output=streamed --spawn_strategy=standalone --cache_test_results=no
+      - run: bazel-genfiles/grakn-core-all-linux/grakn server stop
+
+  test-assembly-linux-apt:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run-bazel-rbe:
+          command: bazel build //bin:assemble-linux-apt
+      - run-bazel-rbe:
+          command: bazel build //server:assemble-linux-apt
+      - run-bazel-rbe:
+          command: bazel build //console:assemble-linux-apt
+      - run: sudo dpkg -i bazel-bin/bin/grakn-core-bin__all.deb
+      - run: sudo dpkg -i bazel-bin/server/grakn-core-server__all.deb
+      - run: sudo dpkg -i bazel-bin/console/grakn-core-console__all.deb
+      - run: sudo chown -R circleci:circleci /opt/grakn/ # TODO: how do we avoid having to chown?
+      - run: nohup grakn server start
+      - run: bazel test //test/common:grakn-application-test --test_output=streamed --spawn_strategy=standalone --cache_test_results=no
+      - run: grakn server stop
+
+  test-assembly-docker:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: test/assembly/docker.py
+
+  deploy-maven-snapshot:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          export DEPLOY_MAVEN_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_MAVEN_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //api:deploy-maven -- snapshot $CIRCLE_SHA1
+          bazel run //protocol:deploy-maven -- snapshot $CIRCLE_SHA1
+          bazel run //concept:deploy-maven -- snapshot $CIRCLE_SHA1
+          bazel run //common:deploy-maven -- snapshot $CIRCLE_SHA1
+
+  deploy-apt-snapshot:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: echo $(date +%s)-$(cat VERSION)-$CIRCLE_SHA1 > VERSION && cat VERSION
+      - run: |
+          export DEPLOY_APT_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_APT_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //bin:deploy-apt -- snapshot
+          bazel run //console:deploy-apt -- snapshot
+          bazel run //server:deploy-apt -- snapshot
+          bazel run //:deploy-apt -- snapshot
+      - run: cp VERSION VERSION.apt
+      - persist_to_workspace:
           root: ~/grakn
           paths:
-            - .
+            - VERSION.apt
 
-  unit-it-test-1:
+  deploy-rpm-snapshot:
     machine: true
     working_directory: ~/grakn
     steps:
-      - *prepare_apt_repositories
-      - *install_yarn_and_maven
-      - *install_node
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - run:
-          name: Create parallelise-unit-tests.txt and parallelise-it-tests.txt For Parallelisation Purpose
-          command: |
-            circleci tests glob "**/src/test/java/**/*Test.java" | circleci tests split --total="2" --index="0" > parallelise-unit-tests-filename.txt
-            cat parallelise-unit-tests-filename.txt | xargs -I {} basename {} | xargs -I {} echo "**/{}" | sort > parallelise-unit-tests.txt
-            circleci tests glob "**/src/test/java/**/*IT.java" | circleci tests split --total="2" --index="0" > parallelise-it-tests-filename.txt
-            cat parallelise-it-tests-filename.txt | xargs -I {} basename {} | xargs -I {} echo "**/{}" | sort > parallelise-it-tests.txt
-      - *list_unit_tests
-      - *list_it_tests
-      - *run_unit_it_tests
-      - *save_test_results
-      - store_artifacts:
-          path: ~/grakn-surefire-reports/
-      - store_test_results:
-          path: ~/grakn-surefire-reports/
+      - install-bazel-linux-rbe
+      - checkout
+      - run: sudo apt install rpm
+      - run: echo $(cat VERSION)_$CIRCLE_SHA1 > VERSION && cat VERSION
+      - run: |
+          export DEPLOY_RPM_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_RPM_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //bin:deploy-rpm -- snapshot
+          bazel run //server:deploy-rpm -- snapshot
+          bazel run //console:deploy-rpm -- snapshot
+          bazel run //:deploy-rpm -- snapshot
+      - run: cp VERSION VERSION.rpm
+      - persist_to_workspace:
+          root: ~/grakn
+          paths:
+            - VERSION.rpm
 
-  unit-it-test-2:
+  test-deployment-linux-apt:
     machine: true
     working_directory: ~/grakn
     steps:
-      - *prepare_apt_repositories
-      - *install_yarn_and_maven
-      - *install_node
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - run:
-          name: Create parallelise-unit-tests.txt and parallelise-it-tests.txt For Parallelisation Purpose
-          command: |
-            circleci tests glob "**/src/test/java/**/*Test.java" | circleci tests split --total="2" --index="1" > parallelise-unit-tests-filename.txt
-            cat parallelise-unit-tests-filename.txt | xargs -I {} basename {} | xargs -I {} echo "**/{}" | sort > parallelise-unit-tests.txt
-            circleci tests glob "**/src/test/java/**/*IT.java" | circleci tests split --total="2" --index="1" > parallelise-it-tests-filename.txt
-            cat parallelise-it-tests-filename.txt | xargs -I {} basename {} | xargs -I {} echo "**/{}" | sort > parallelise-it-tests.txt
-      - *list_unit_tests
-      - *list_it_tests
-      - *run_unit_it_tests
-      - *save_test_results
-      - store_artifacts:
-          path: ~/grakn-surefire-reports/
-      - store_test_results:
-          path: ~/grakn-surefire-reports/
-
-  distribution-e2e:
-    machine: true
-    working_directory: ~/grakn
-    steps:
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - run: mvn verify -pl :test-distribution -Dtest="ai.grakn.distribution.**"
-      - *save_test_results
-      - store_artifacts:
-          path: ~/grakn-surefire-reports/
-      - store_test_results:
-          path: ~/grakn-surefire-reports/
-
-  client-java-e2e:
-    machine: true
-    working_directory: ~/grakn
-    steps:
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - run: mvn verify -pl :test-client-java -Dtest="ai.grakn.client.ClientJavaE2E" --also-make -DfailIfNoTests=false
-      - *save_test_results
-      - store_artifacts:
-          path: ~/grakn-surefire-reports/
-      - store_test_results:
-          path: ~/grakn-surefire-reports/
-
-  snb-e2e:
-    machine: true
-    working_directory: ~/grakn
-    steps:
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - *start_grakn_server
-      - run: PATH=$PATH:./grakn-test/test-snb/src/main/bash:./grakn-test/test-integration/src/test/bash:./grakn-dist/target/grakn-core-test PACKAGE=./grakn-dist/target/grakn-core-test WORKSPACE=. ./grakn-test/test-snb/src/main/bash/load.sh
-      - run: PATH=$PATH:./grakn-test/test-snb/src/main/bash:./grakn-test/test-integration/src/test/bash:./grakn-dist/target/grakn-core-test PACKAGE=./grakn-dist/target/grakn-core-test WORKSPACE=. ./grakn-test/test-snb/src/main/bash/validate.sh
-
-  biomed-e2e:
-    machine: true
-    working_directory: ~/grakn
-    steps:
-      - *attach_grakn_workspace
-      - *restore_m2_cache
-      - *start_grakn_server
-      - run: PATH=$PATH:./grakn-dist/target/grakn-core-test ./grakn-test/test-biomed/load.sh
-      - run: PATH=$PATH:./grakn-dist/target/grakn-core-test ./grakn-test/test-biomed/validate.sh
-
-  client-nodejs-e2e:
-      machine: true
-      working_directory: ~/grakn
-      steps:
-        - *attach_grakn_workspace
-        - *prepare_apt_repositories
-        - *install_yarn_and_maven
-        - *install_node
-        - *start_grakn_server
-        - run: cd grakn-dist/target/grakn-core-test/ && ./graql console -f ./examples/basic-genealogy.gql -k gene
-        - run: cd client-nodejs && yarn install && yarn run test
-
-  client-python-e2e:
-      machine: true
-      working_directory: ~/grakn
-      steps:
-        - *attach_grakn_workspace
-        - run:
-            name: Install python deps
-            command: echo y | pyenv install 3.6.0; pyenv global 3.6.0
-        - run:
-            name: Install protobuf and grpc
-            command: pip install protobuf grpcio grpcio-tools --user
-        - *start_grakn_server
-        - run: cd client-python && make protobuf
-        - run: cd client-python && python -m unittest discover ./tests/integration/ -v
-
-  workbase-unit-tests:
-      docker:
-        - image: circleci/node:8.11.2
-      working_directory: ~/grakn
-      steps:
-        - checkout
-        - run: cd workbase && npm install
-        - run: cd workbase && npm test
-
-  workbase-e2e:
-      machine: true
-      working_directory: ~/grakn
-      steps:
-        - *attach_grakn_workspace
-        - *prepare_apt_repositories
-        - *install_node
-        - run: sudo apt install xvfb libxtst6 libxss1 libgtk2.0-0 -y
-        - run: sudo apt install libnss3 libasound2 libgconf-2-4 -y
-        - *start_grakn_server
-        - run: cd grakn-dist/target/grakn-core-test/ && ./graql console -f ./examples/basic-genealogy.gql -k gene
-        - run: cd workbase && npm install
-        - run: Xvfb :99 &
-        - run: export DISPLAY=:99
-        - run: cd workbase && npm run e2e
-
-  build-workbase-linux:
-      docker:
-        - image: circleci/node:8.11.2
-      working_directory: ~/grakn
-      steps:
-        - *attach_grakn_workspace
-        - run: cd workbase && npm install
-        - run: cd workbase && npm run build
-        - persist_to_workspace:
-            root: ~/grakn
-            paths:
-              - ./workbase/build/
-
-  build-workbase-mac:
-        macos:
-            xcode: "9.0"
-        working_directory: ~/grakn
-        steps:
-          - *attach_grakn_workspace
-          - *start_grakn_server
-          - run: cd grakn-dist/target/grakn-core-test/ && ./graql console -f ./examples/basic-genealogy.gql -k gene
-          - run: cd workbase && npm install
-          - run: cd workbase && npm run e2e
-          - run: cd workbase && npm run build
-          - persist_to_workspace:
-              root: ~/grakn
-              paths:
-                - ./workbase/build/
-
-  publish-github-draft: #TO BE COMPLETED
-    docker:
-      - image: cibuilds/github:0.10
-    working_directory: ~/grakn
-    steps:
+      - install-bazel-linux-rbe
+      - checkout
       - attach_workspace:
-          at: ~/grakn
-      - run:
-          name: "Publish Release on GitHub"
-          command: |
-            ghr -t ${GITHUB_TOKEN} -u ${CIRCLE_PROJECT_USERNAME} -r ${CIRCLE_PROJECT_REPONAME} -c ${CIRCLE_SHA1} ./grakn-dist/target/ ./workbase/build
+          at: ~/circleci-workspace
+      - run: sudo add-apt-repository 'deb [ arch=all ] https://repo.grakn.ai/repository/apt-snapshot/ trusty main'
+      - run: sudo apt-key adv --keyserver keyserver.ubuntu.com --recv 8F3DA4B5E9AEF44C
+      - run: sudo apt update
+      - run: mv ~/circleci-workspace/VERSION.apt VERSION
+      - run: cat VERSION
+      - run: sudo apt install grakn-core-all=$(cat VERSION)
+      - run: sudo chown -R circleci:circleci /opt/grakn/ # TODO: how do we avoid having to chown?
+      - run: nohup grakn server start
+      - run: bazel test //test/common:grakn-application-test --test_output=streamed --spawn_strategy=standalone --cache_test_results=no
+      - run: grakn server stop
+
+  test-deployment-linux-rpm:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - checkout
+      - attach_workspace:
+          at: ~/circleci-workspace
+      - run: mv ~/circleci-workspace/VERSION.rpm VERSION
+      - run: test/deployment/rpm.py
+
+  sync-dependencies:
+    machine: true
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          export SYNC_DEPENDENCIES_TOKEN=$REPO_GITHUB_TOKEN
+          bazel run @graknlabs_build_tools//ci:sync-dependencies -- \
+          --source grakn@$CIRCLE_SHA1 \
+          --targets \
+          grakn-kgms:master benchmark:master workbase:master \
+          client-java:master client-python:master client-nodejs:master \
+          docs:master examples:master
+
+  release-approval:
+    machine: true
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          export RELEASE_APPROVAL_USERNAME=$REPO_GITHUB_USERNAME
+          export RELEASE_APPROVAL_TOKEN=$REPO_GITHUB_TOKEN
+          bazel run @graknlabs_build_tools//ci:release-approval
+
+  deploy-github:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          export DEPLOY_GITHUB_TOKEN=$REPO_GITHUB_TOKEN
+          bazel run //:deploy-github -- $CIRCLE_SHA1
+
+  deploy-apt:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: cat VERSION
+      - run: |
+          export DEPLOY_APT_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_APT_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //bin:deploy-apt -- release
+          bazel run //console:deploy-apt -- release
+          bazel run //server:deploy-apt -- release
+          bazel run //:deploy-apt -- release
+
+  deploy-rpm:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: sudo apt install rpm
+      - run: cat VERSION
+      - run: |
+          export DEPLOY_RPM_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_RPM_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //bin:deploy-rpm -- release
+          bazel run //server:deploy-rpm -- release
+          bazel run //console:deploy-rpm -- release
+          bazel run //:deploy-rpm -- release
+
+  deploy-brew:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          export DEPLOY_BREW_TOKEN=$REPO_GITHUB_TOKEN
+          bazel run //:deploy-brew -- release
+
+  deploy-docker:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: |
+          docker login -u $REPO_DOCKER_USERNAME -p $REPO_DOCKER_PASSWORD
+          bazel run //:deploy-docker
+
+  deploy-maven:
+    machine: true
+    working_directory: ~/grakn
+    steps:
+      - install-bazel-linux-rbe
+      - checkout
+      - run: cat VERSION
+      - run: |
+          export DEPLOY_MAVEN_USERNAME=$REPO_GRAKN_USERNAME
+          export DEPLOY_MAVEN_PASSWORD=$REPO_GRAKN_PASSWORD
+          bazel run //api:deploy-maven -- release $(cat VERSION)
+          bazel run //protocol:deploy-maven -- release $(cat VERSION)
+          bazel run //concept:deploy-maven -- release $(cat VERSION)
+          bazel run //common:deploy-maven -- release $(cat VERSION)
+
+  release-cleanup:
+    machine: true
+    steps:
+      - checkout
+      - run: git push --delete origin grakn-release-branch
 
 workflows:
-  version: 2
-  run-all-tests:
+  grakn-core:
     jobs:
-      - build
-      - workbase-unit-tests
-      - unit-it-test-1:
+      - build:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-common:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-console:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-server:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-integration:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-integration-reasoner:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-integration-analytics:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-end-to-end:
+          filters:
+            branches:
+              ignore: grakn-release-branch
+      - test-assembly-mac-zip:
+          filters:
+            branches:
+              only: master
           requires:
             - build
-      - unit-it-test-2:
+            - test-common
+            - test-console
+            - test-server
+            - test-integration
+            - test-integration-reasoner
+            - test-integration-analytics
+            - test-end-to-end
+      - test-assembly-windows-zip:
+          filters:
+            branches:
+              only: master
           requires:
             - build
-      - distribution-e2e:
+            - test-common
+            - test-console
+            - test-server
+            - test-integration
+            - test-integration-reasoner
+            - test-integration-analytics
+            - test-end-to-end
+      - test-assembly-linux-targz:
+          filters:
+            branches:
+              only: master
           requires:
             - build
-      - snb-e2e:
+            - test-common
+            - test-console
+            - test-server
+            - test-integration
+            - test-integration-reasoner
+            - test-integration-analytics
+            - test-end-to-end
+      - test-assembly-linux-apt:
+          filters:
+            branches:
+              only: master
           requires:
             - build
-      - biomed-e2e:
+            - test-common
+            - test-console
+            - test-server
+            - test-integration
+            - test-integration-reasoner
+            - test-integration-analytics
+            - test-end-to-end
+      - test-assembly-docker:
+          filters:
+            branches:
+              only: master
           requires:
             - build
-      - client-nodejs-e2e:
+            - test-common
+            - test-console
+            - test-server
+            - test-integration
+            - test-integration-reasoner
+            - test-integration-analytics
+            - test-end-to-end
+      - deploy-maven-snapshot:
+          filters:
+            branches:
+              only: master
           requires:
-            - build
-      - client-python-e2e:
+            - test-assembly-mac-zip
+            - test-assembly-windows-zip
+            - test-assembly-linux-targz
+            - test-assembly-linux-apt
+            - test-assembly-docker
+      - deploy-apt-snapshot:
+          filters:
+            branches:
+              only: master
           requires:
-            - build
-      - client-java-e2e:
+            - test-assembly-mac-zip
+            - test-assembly-windows-zip
+            - test-assembly-linux-targz
+            - test-assembly-linux-apt
+            - test-assembly-docker
+      - deploy-rpm-snapshot:
+          filters:
+            branches:
+              only: master
           requires:
-            - build
-      - workbase-e2e:
-           requires:
-             - build
+            - test-assembly-mac-zip
+            - test-assembly-windows-zip
+            - test-assembly-linux-targz
+            - test-assembly-linux-apt
+            - test-assembly-docker
+      - test-deployment-linux-apt:
+          filters:
+            branches:
+              only: master
+          requires:
+            - deploy-apt-snapshot
+      - test-deployment-linux-rpm:
+          filters:
+            branches:
+              only: master
+          requires:
+            - deploy-rpm-snapshot
+      - sync-dependencies:
+          filters:
+            branches:
+              only: master
+          requires:
+            - deploy-maven-snapshot
+            - test-deployment-linux-apt
+            - test-deployment-linux-rpm
+      - release-approval:
+          filters:
+            branches:
+              only: master
+          requires:
+            - sync-dependencies
 
-  build-and-deploy:
+  grakn-core-release:
     jobs:
-      - grakn-release-build:
+      - deploy-github:
           filters:
-            tags:
-              only: /^v.*/
             branches:
-              ignore: /.*/
-      - build-workbase-mac:
+              only: grakn-release-branch
+      - deploy-approval:
+          type: approval
           requires:
-             - grakn-release-build
+            - deploy-github
           filters:
-            tags:
-              only: /^v.*/
             branches:
-              ignore: /.*/
-      - build-workbase-linux:
+              only: grakn-release-branch
+      - deploy-apt:
+          filters:
+            branches:
+              only: grakn-release-branch
           requires:
-             - grakn-release-build
+            - deploy-approval
+      - deploy-rpm:
           filters:
-            tags:
-              only: /^v.*/
             branches:
-              ignore: /.*/
-      - publish-github-draft:
+              only: grakn-release-branch
           requires:
-            - build-workbase-mac
-            - build-workbase-linux
+            - deploy-approval
+      - deploy-brew:
           filters:
-            tags:
-              only: /^v.*/
             branches:
-              ignore: /.*/
+              only: grakn-release-branch
+          requires:
+            - deploy-approval
+      - deploy-docker:
+          filters:
+            branches:
+              only: grakn-release-branch
+          requires:
+            - deploy-approval
+      - deploy-maven:
+          filters:
+            branches:
+              only: grakn-release-branch
+          requires:
+            - deploy-approval
+      - release-cleanup:
+          filters:
+            branches:
+              only: grakn-release-branch
+          requires:
+            - deploy-apt
+            - deploy-rpm
+            - deploy-brew
+            - deploy-docker
+            - deploy-maven

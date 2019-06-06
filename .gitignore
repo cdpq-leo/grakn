@@ -1,10 +1,14 @@
 # Mac files #
 .DS_Store
 
+# Bazel files #
+bazel-*
+
 # IDE files #
 .idea/
 *.iml
 *.geany
+.ijwb/
 
 # VS Code files #
 .vscode/
@@ -13,15 +17,15 @@
 .classpath
 
 # Compiled files #
+dist/
 out/
-target/
 *.class
 
 # Mobile Tools for Java (J2ME) files #
 .mtj.tmp/
 
 # Package Files #
-*.jar
+*.jarg
 *.war
 *.ear
 
@@ -49,13 +53,10 @@ grakn-test/test-biomed/data/*
 # Benchmark Files #
 grakn-test/test-integration/benchmarks/
 
-# Integration Test Files #
-grakn-package
-hadoop
-parameters_bi.log
-parameters_interactive.log
-social_network
-
 # VIM swap files #
 *.swp
 *.swo
+
+
+# Python cache #
+__pycache__

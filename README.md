@@ -1,30 +1,23 @@
 ![GRAKN.AI](https://grakn.ai/assets/img/Grakn%20logo%20-%20transparent.png)
 
 ---
+[![CircleCI](https://circleci.com/gh/graknlabs/grakn/tree/master.svg?style=shield)](https://circleci.com/gh/graknlabs/grakn/tree/master)
 [![GitHub release](https://img.shields.io/github/release/graknlabs/grakn.svg)](https://github.com/graknlabs/grakn/releases/latest)
-[![Build Status](https://travis-ci.org/graknlabs/grakn.svg?branch=internal)](https://travis-ci.org/graknlabs/grakn)
-[![Coverage Status](https://codecov.io/gh/graknlabs/grakn/branch/master/graph/badge.svg)](https://codecov.io/gh/graknlabs/grakn)
 [![Javadocs](https://javadoc.io/badge/ai.grakn/grakn.svg)](https://javadoc.io/doc/ai.grakn/grakn)
 [![Slack Status](http://grakn-slackin.herokuapp.com/badge.svg)](https://grakn.ai/slack)
-[![Stack Overflow][stackoverflow-shield]][stackoverflow-link]
-[![Download count](https://img.shields.io/github/downloads/graknlabs/grakn/total.svg)](https://grakn.ai/download)
----
-[![Static Bugs](https://sonarcloud.io/api/project_badges/measure?project=ai.grakn%3Agrakn&metric=bugs)](https://sonarcloud.io/dashboard?id=ai.grakn%3Agrakn)
-[![Code Smells](https://sonarcloud.io/api/project_badges/measure?project=ai.grakn%3Agrakn&metric=code_smells)](https://sonarcloud.io/dashboard?id=ai.grakn%3Agrakn)
-[![Duplicated Code](https://sonarcloud.io/api/project_badges/measure?project=ai.grakn%3Agrakn&metric=duplicated_lines_density)](https://sonarcloud.io/dashboard?id=ai.grakn%3Agrakn)
+[![Discussion Forum](https://img.shields.io/discourse/https/discuss.grakn.ai/topics.svg)](https://discuss.grakn.ai)
+[![Stack Overflow](https://img.shields.io/badge/stackoverflow-grakn-796de3.svg)](https://stackoverflow.com/questions/tagged/grakn)
+[![Stack Overflow](https://img.shields.io/badge/stackoverflow-graql-3dce8c.svg)](https://stackoverflow.com/questions/tagged/graql)
 
-[stackoverflow-shield]: https://img.shields.io/badge/stackoverflow-grakn-blue.svg
-[stackoverflow-link]: https://stackoverflow.com/questions/tagged/grakn
+Building intelligent systems starts at the database. Grakn is an intelligent database: a knowledge graph engine to organise complex networks of data and make it queryable.
 
-Grakn is the knowledge graph engine to organise complex networks of data and making it queryable.
-
-| Get Started | Documentation | Discussion | _Join the Academy!_ |
-|:------------|:--------------|:-----------|:---------------------|
-| Whether you are new to programming or an experienced developer, it’s easy to learn and use Grakn. Get set up quickly with [quickstart tutorial](https://dev.grakn.ai/docs/get-started/quickstart-tutorial). | Documentation for Grakn’s development library and Graql language API, along with tutorials and guides, are available online. Visit our [documentation portal](https://dev.grakn.ai/). | When you’re stuck on a problem, collaborating helps. Ask your question on [StackOverflow](https://stackoverflow.com/questions/tagged/graql+or+grakn) or discuss it in our [Discussion Forum](https://discuss.grakn.ai/). | _Learn everything from the basic foundations to advanced topics of knowledge engineering and be an expert. Join [Grakn Academy](https://dev.grakn.ai/academy)._|
+| Get Started | Documentation | Discussion |
+|:------------|:--------------|:-----------|
+| Whether you are new to coding or an experienced developer, it’s easy to learn and use Grakn. Get set up quickly with [quickstart tutorial](https://dev.grakn.ai/docs/general/quickstart). | Documentation for Grakn’s development library and Graql language API, along with tutorials and guides, are available online. Visit our [documentation portal](https://dev.grakn.ai/). | When you’re stuck on a problem, collaborating helps. Ask your question on [StackOverflow](https://stackoverflow.com/questions/tagged/graql+or+grakn) or discuss it on our [Discussion Forum](https://discuss.grakn.ai/). |
 
 # Meet Grakn and Graql
 
-Grakn is the knowledge graph engine to organise complex networks of data and making it queryable, by performing [knowledge engineering](https://en.wikipedia.org/wiki/Knowledge_engineering). Rooted in [Knowledge Representation and Automated Reasoning](https://en.wikipedia.org/wiki/Knowledge_representation_and_reasoning), Grakn provides the [knowledge foundation](https://en.wikipedia.org/wiki/Knowledge_base) for cognitive and intelligent (e.g. AI) systems, by providing an intelligent language for modelling, transactions and analytics. Being a distributed database, Grakn is designed to scale over a network of computers through partitioning and replication.
+Grakn is an intelligent database: a knowledge graph engine to organise complex networks of data and making it queryable, by performing [knowledge engineering](https://en.wikipedia.org/wiki/Knowledge_engineering). Rooted in [Knowledge Representation and Automated Reasoning](https://en.wikipedia.org/wiki/Knowledge_representation_and_reasoning), Grakn provides the [knowledge foundation](https://en.wikipedia.org/wiki/Knowledge_base) for cognitive and intelligent (e.g. AI) systems, by providing an intelligent language for modelling, transactions and analytics. Being a distributed database, Grakn is designed to scale over a network of computers through partitioning and replication.
 
 Under the hood, Grakn has built an expressive knowledge representation system based on [hypergraph theory](https://en.wikipedia.org/wiki/Hypergraph) (a subfield in mathematics that generalises an edge to be a set of vertices) with a transactional query interface, Graql. Graql is Grakn’s reasoning (through OLTP) and analytics (through OLAP) declarative query language. 
 
@@ -44,16 +37,37 @@ Grakn’s query language performs distributed [Pregel](https://kowshik.github.io
 
 With the expressivity of the schema, inference through OLTP and distributed algorithms through OLAP, Grakn provides strong abstraction over low-level data constructs and complicated relationships through its query language. The language provides a higher-level schema, OLTP, and OLAP query language, that makes working with complex data a lot easier. When developers can achieve more by writing less code, productivity rate increases by orders of magnitude.
 
-## System Requirements
+## Download and Running Grakn Core
 
-- Unix-based Operating Systems (Linux and Mac OSX)
-- Java 8 (OpenJDK or Oracle Java) with the $JAVA_HOME set accordingly
-- Yarn (in order to build Dashboard)
+To run Grakn Core (which you can download from the [Download Centre](https://grakn.ai/download) or [GitHub Releases](https://github.com/graknlabs/grakn/releases)), you need to have Java 8 (OpenJDK or Oracle Java) installed.
 
-You can build Grakn using Maven:
+You can visit the [Setup Guide](https://dev.grakn.ai/docs/running-grakn/install-and-run) to help your installation.
+
+## Compiling Grakn Core from Source
+
+> Note: You don't need to compile Grakn Core from source if you just want to use Grakn. See the _"Download and Running Grakn Core"_ section above.
+
+1. Make sure you have the following dependencies installed on your machine:
+    - Java 8
+    - Python >= 2.7 and Pip >= 18.1
+    - [Bazel](http://docs.bazel.build/install.html)
+1. Depending on your Operating System, you can build Grakn with either one of the following commands: 
 ```
-$ mvn package -DskipTests
+$ bazel build //:assemble-linux-targz
 ```
+Outputs to: `bazel-genfiles/grakn-core-all-linux.tar.gz`
+```
+$ bazel build //:assemble-mac-zip
+```
+Outputs to: `bazel-genfiles/grakn-core-all-mac.zip`
+```
+$ bazel build //:assemble-windows-zip
+```
+Outputs to: `bazel-genfiles/grakn-core-all-windows.zip`
+
+## Contributions
+
+Grakn Core is built using various state-of-the-art open-source Graph and Distributed Computing frameworks: [ANTLR](http://www.antlr.org), [Apache Cassandra](http://cassandra.apache.org), [Apache Hadoop](https://hadoop.apache.org), [Apache Spark](http://spark.apache.org), [Apache TinkerPop](http://tinkerpop.apache.org), [Bazel](https://bazel.build), [GRPC](https://grpc.io) and [JanusGraph](http://janusgraph.org). Thank you!
 
 ## Licensing
 
